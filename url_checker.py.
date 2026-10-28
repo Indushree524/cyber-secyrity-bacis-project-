@@ -1,0 +1,110 @@
+from urllib.parse import urlparse
+import ipaddress
+import re
+
+
+def check_url(url):
+    warnings = []
+
+    # Remove extra spaces
+    url = url.strip()
+
+    if not url:
+        print("Error: URL cannot be empty.")
+        return
+
+    # Add a scheme if the user did not enter one
+    if "://" not in url:
+        url = "https://" + url
+
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+
+    # Check whether the URL is valid
+    if not hostname:
+        print("Invalid URL!")
+        return
+
+    # Check HTTPS
+    if parsed.scheme.lower() != "https":
+        warnings.append("URL does not use HTTPS.")
+
+    # Check for IP address as hostname
+    try:
+        ipaddress.ip_address(hostname)
+        warnings.append("URL uses an IP address instead of a domain name.")
+    except ValueError:
+        pass
+
+    # Check for suspicious @ symbol in the network location
+    if "@" in parsed.netloc:
+        warnings.append("URL contains an @ symbol.")
+
+    # Check for unusually long URLs
+    if len(url) > 100:
+        warnings.append("URL is unusually long.")
+
+    # Check for suspicious keywords
+    suspicious_words = [
+        "login",
+        "verify",
+        "update",
+        "free",
+        "password",
+        "banking",
+        "account",
+        "secure"
+    ]
+
+    lower_url = url.lower()
+
+    for word in suspicious_words:
+        if re.search(r"[./?&=_-]" + re.escape(word) +
+                     r"([./?&=_-]|$)", lower_url):
+            warnings.append(
+                "Contains potentially suspicious keyword: " + word
+            )
+
+    # Check for misleading domain patterns
+    if hostname.count("-") >= 3:
+        warnings.append("Domain contains many hyphens.")
+
+    # Display results
+    print("\n========== URL CHECK REPORT ==========")
+    print("URL:", url)
+    print("Domain:", hostname)
+
+    if warnings:
+        print("\nWarning signs detected:")
+
+        for number, warning in enumerate(warnings, start=1):
+            print(str(number) + ".", warning)
+
+        print("\nResult: Be cautious with this URL.")
+    else:
+        print("\nNo basic warning signs detected.")
+
+    print("\nNote: This tool cannot guarantee that a URL is safe.")
+    print("======================================")
+
+
+def main():
+    print("===================================")
+    print("     SUSPICIOUS URL CHECKER")
+    print("===================================")
+
+    while True:
+        url = input(
+            "\nEnter a URL to check (or type exit): "
+        ).strip()
+
+        if url.lower() == "exit":
+            print("Program closed.")
+            break
+
+        check_url(url)
+
+
+if __name__ == "__main__":
+    main()
+
