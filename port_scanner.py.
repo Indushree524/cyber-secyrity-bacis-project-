@@ -1,0 +1,79 @@
+import socket
+import ipaddress
+
+
+def scan_port(target, port, timeout=0.5):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            result = sock.connect_ex((target, port))
+
+            if result == 0:
+                return True
+
+    except (socket.error, OSError):
+        pass
+
+    return False
+
+
+def main():
+    print("=" * 40)
+    print("       PYTHON NETWORK PORT SCANNER")
+    print("=" * 40)
+
+    target = input(
+        "Enter your own computer's IP address (127.0.0.1 for this computer): "
+    ).strip()
+
+    try:
+        ipaddress.ip_address(target)
+    except ValueError:
+        print("Invalid IP address. Please try again.")
+        return
+
+    print("\nScan only devices you own or have permission to test.")
+
+    try:
+        start_port = int(input("Enter starting port (1-65535): "))
+        end_port = int(input("Enter ending port (1-65535): "))
+
+        if not (1 <= start_port <= end_port <= 65535):
+            print("Invalid port range.")
+            return
+
+    except ValueError:
+        print("Please enter valid port numbers.")
+        return
+
+    if end_port - start_port > 1000:
+        print("Please scan no more than 1001 ports at a time.")
+        return
+
+    print(f"\nScanning {target}...")
+    print("-" * 40)
+
+    open_ports = []
+
+    for port in range(start_port, end_port + 1):
+        if scan_port(target, port):
+            try:
+                service = socket.getservbyport(port, "tcp")
+            except OSError:
+                service = "Unknown service"
+
+            open_ports.append(port)
+            print(f"Port {port}: OPEN - {service}")
+
+    print("-" * 40)
+
+    if open_ports:
+        print("Open ports found:", open_ports)
+    else:
+        print("No open TCP ports detected.")
+
+    print("Scan completed.")
+
+
+if __name__ == "__main__":
+    main()
