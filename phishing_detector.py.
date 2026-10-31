@@ -1,0 +1,108 @@
+from urllib.parse import urlparse
+import re
+
+# Suspicious words commonly found in phishing URLs
+suspicious_words = [
+    "login",
+    "verify",
+    "update",
+    "secure",
+    "account",
+    "banking",
+    "password",
+    "confirm",
+    "free",
+    "winner"
+]
+
+# Check URL
+def check_url(url):
+
+    score = 0
+    reasons = []
+
+    url = url.strip()
+
+    # Check HTTPS
+    if not url.lower().startswith("https://"):
+        score += 1
+        reasons.append("Website does not use HTTPS")
+
+    # Parse URL
+    if "://" not in url:
+        url = "http://" + url
+
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+
+    # Check valid hostname
+    if not hostname:
+        return ["Invalid URL"], 10
+
+    # Check IP address
+    ip_pattern = r"^\d{1,3}(\.\d{1,3}){3}$"
+
+    if re.match(ip_pattern, hostname):
+        score += 2
+        reasons.append("URL uses an IP address")
+
+    # Check suspicious words
+    for word in suspicious_words:
+        if word in url.lower():
+            score += 1
+            reasons.append(
+                "Suspicious keyword found: " + word
+            )
+
+    # Check @ symbol
+    if "@" in url:
+        score += 2
+        reasons.append("URL contains @ symbol")
+
+    # Check URL length
+    if len(url) > 75:
+        score += 1
+        reasons.append("URL is unusually long")
+
+    # Check too many hyphens in hostname
+    if hostname.count("-") >= 3:
+        score += 1
+        reasons.append("Too many hyphens in hostname")
+
+    return reasons, score
+
+
+# Main program
+def main():
+
+    print("===================================")
+    print("       PHISHING URL DETECTOR")
+    print("===================================")
+
+    url = input("\nEnter website URL: ")
+
+    reasons, score = check_url(url)
+
+    print("\n----------- SCAN RESULT -----------")
+
+    if score >= 3:
+        print("WARNING: SUSPICIOUS URL!")
+    else:
+        print("NO OBVIOUS WARNING SIGNS FOUND.")
+
+    print("\nRisk Score:", score)
+
+    if reasons:
+        print("\nDetected Warning Signs:")
+
+        for reason in reasons:
+            print("-", reason)
+    else:
+        print("\nNo warning signs detected.")
+
+    print("\nNote: This is a basic educational detector.")
+    print("It cannot guarantee website safety.")
+
+
+if __name__ == "__main__":
+    main()
