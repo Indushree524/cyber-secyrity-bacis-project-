@@ -1,0 +1,244 @@
+
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+import hashlib
+import secrets
+import time
+import json
+import os
+import hmac
+
+DATABASE = "users.json"
+OTP_EXPIRY = 120
+MAX_ATTEMPTS = 3
+
+
+class MultiFactorAuthentication:
+
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Multi-Factor Authentication System")
+        self.root.geometry("430x430")
+        self.root.resizable(False, False)
+
+        self.failed_attempts = {}
+        self.create_database()
+        self.create_interface()
+
+    def create_database(self):
+        if not os.path.exists(DATABASE):
+            with open(DATABASE, "w") as file:
+                json.dump({}, file)
+
+    def load_users(self):
+        with open(DATABASE, "r") as file:
+            return json.load(file)
+
+    def save_users(self, users):
+        with open(DATABASE, "w") as file:
+            json.dump(users, file, indent=4)
+
+    def hash_password(self, password, salt):
+        return hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode(),
+            bytes.fromhex(salt),
+            200000
+        ).hex()
+
+    def create_interface(self):
+        title = tk.Label(
+            self.root,
+            text="SECURE LOGIN SYSTEM",
+            font=("Arial", 19, "bold"),
+            fg="blue"
+        )
+        title.pack(pady=25)
+
+        tk.Label(
+            self.root,
+            text="Username",
+            font=("Arial", 12)
+        ).pack()
+
+        self.username = tk.Entry(
+            self.root,
+            width=30,
+            font=("Arial", 12)
+        )
+        self.username.pack(pady=8)
+
+        tk.Label(
+            self.root,
+            text="Password",
+            font=("Arial", 12)
+        ).pack()
+
+        self.password = tk.Entry(
+            self.root,
+            width=30,
+            show="*",
+            font=("Arial", 12)
+        )
+        self.password.pack(pady=8)
+
+        tk.Button(
+            self.root,
+            text="Register",
+            width=20,
+            bg="green",
+            fg="white",
+            command=self.register
+        ).pack(pady=12)
+
+        tk.Button(
+            self.root,
+            text="Login",
+            width=20,
+            bg="blue",
+            fg="white",
+            command=self.login
+        ).pack(pady=8)
+
+        tk.Label(
+            self.root,
+            text="Two-Factor Authentication Enabled",
+            fg="green",
+            font=("Arial", 10, "bold")
+        ).pack(pady=20)
+
+    def register(self):
+        username = self.username.get().strip()
+        password = self.password.get()
+
+        if not username or not password:
+            messagebox.showerror(
+                "Error", "Enter username and password"
+            )
+            return
+
+        if len(password) < 8:
+            messagebox.showerror(
+                "Error", "Password must contain at least 8 characters"
+            )
+            return
+
+        users = self.load_users()
+
+        if username in users:
+            messagebox.showerror(
+                "Error", "Username already exists"
+            )
+            return
+
+        salt = secrets.token_bytes(16).hex()
+        password_hash = self.hash_password(password, salt)
+
+        users[username] = {
+            "salt": salt,
+            "password_hash": password_hash
+        }
+
+        self.save_users(users)
+
+        messagebox.showinfo(
+            "Success", "Registration completed successfully!"
+        )
+
+        self.password.delete(0, tk.END)
+
+    def login(self):
+        username = self.username.get().strip()
+        password = self.password.get()
+
+        if not username or not password:
+            messagebox.showerror(
+                "Error", "Enter username and password"
+            )
+            return
+
+        if self.failed_attempts.get(username, 0) >= MAX_ATTEMPTS:
+            messagebox.showerror(
+                "Blocked",
+                "Too many failed attempts. Restart the application."
+            )
+            return
+
+        users = self.load_users()
+
+        if username not in users:
+            self.record_failure(username)
+            messagebox.showerror(
+                "Login Failed", "Invalid username or password"
+            )
+            return
+
+        user = users[username]
+
+        entered_hash = self.hash_password(
+            password, user["salt"]
+        )
+
+        if not hmac.compare_digest(
+            entered_hash, user["password_hash"]
+        ):
+            self.record_failure(username)
+            messagebox.showerror(
+                "Login Failed", "Invalid username or password"
+            )
+            return
+
+        self.failed_attempts[username] = 0
+        self.password.delete(0, tk.END)
+
+        self.verify_otp(username)
+
+    def record_failure(self, username):
+        self.failed_attempts[username] = (
+            self.failed_attempts.get(username, 0) + 1
+        )
+
+    def verify_otp(self, username):
+        otp = f"{secrets.randbelow(1000000):06d}"
+        creation_time = time.time()
+
+        # DEMO ONLY: Display OTP in the terminal.
+        print("\nGenerated OTP:", otp)
+        print("OTP expires in 120 seconds.\n")
+
+        messagebox.showinfo(
+            "OTP Generated",
+            "A demonstration OTP has been generated.\n"
+            "Check the Python terminal to see it."
+        )
+
+        entered_otp = simpledialog.askstring(
+            "OTP Verification",
+            "Enter your 6-digit OTP:"
+        )
+
+        if entered_otp is None:
+            return
+
+        if time.time() - creation_time > OTP_EXPIRY:
+            messagebox.showerror(
+                "Expired", "OTP has expired. Please log in again."
+            )
+            return
+
+        if hmac.compare_digest(entered_otp, otp):
+            messagebox.showinfo(
+                "Access Granted",
+                f"Welcome, {username}!\n"
+                "Two-factor authentication successful."
+            )
+        else:
+            messagebox.showerror(
+                "Access Denied", "Invalid OTP. Login failed."
+            )
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = MultiFactorAuthentication(root)
+    root.mainloop()
